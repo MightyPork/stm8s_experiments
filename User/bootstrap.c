@@ -38,7 +38,7 @@ void SimpleInit(void)
 
 	// Timebase generation counter
 	TIM4_UpdateRequestConfig(TIM4_UPDATESOURCE_REGULAR);
-	TIM4_PrescalerConfig(TIM4_PRESCALER_128, TIM4_PSCRELOADMODE_IMMEDIATE);
+	TIM4_PrescalerConfig(TIM4_PRESCALER_64, TIM4_PSCRELOADMODE_IMMEDIATE);
 	TIM4_SetAutoreload(0xFF);
 	TIM4_ARRPreloadConfig(ENABLE);
 	TIM4_ITConfig(TIM4_IT_UPDATE, ENABLE);
@@ -60,7 +60,7 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 }
 
 /** Delay ms */
-void Delay(uint16_t ms)
+void delay_ms(uint16_t ms)
 {
 	uint16_t start = time_ms;
 	uint16_t t2;
@@ -72,13 +72,15 @@ void Delay(uint16_t ms)
 	}
 }
 
-/** Delay N seconds */
-void Delay_s(uint16_t s)
+/** Helper for looping with periodic branches */
+bool ms_loop_elapsed(uint16_t *start, uint16_t duration)
 {
-	while (s != 0) {
-		Delay(1000);
-		s--;
+	if (time_ms - *start >= duration) {
+		*start = time_ms;
+		return TRUE;
 	}
+
+	return FALSE;
 }
 
 /**
