@@ -10,7 +10,17 @@
 /** Mask applied to the FG CREG to clear any previous waveform preset */
 #define FG_WFM_MASK (u16)(FG_OPBITEN | FG_DIV2 | FG_MODE)
 
-static void FG_SPI_Send16(uint16_t word);
+/**
+ * Send 16 bits
+ * @param word
+ */
+static void FG_SPI_Send16(uint16_t word)
+{
+	while(!SPI_GetFlagStatus(SPI_FLAG_TXE));
+	SPI_SendData((u8)(word >> 8));
+	while(!SPI_GetFlagStatus(SPI_FLAG_TXE));
+	SPI_SendData((u8)(word));
+}
 
 /**
  * @brief Write a single word over SPI to a FG
@@ -19,8 +29,13 @@ static void FG_SPI_Send16(uint16_t word);
  */
 static void FG_WriteWord(FG_Instance *inst, uint16_t word)
 {
+	// NSS down
 	inst->NSS_GPIO->ODR &= ~inst->NSS_PIN;
+	// Data
 	FG_SPI_Send16(word);
+	// Wait for write to complete
+	while(SPI_GetFlagStatus(SPI_FLAG_BSY));
+	// NSS up
 	inst->NSS_GPIO->ODR |= inst->NSS_PIN;
 }
 
@@ -34,6 +49,7 @@ static void FG_WriteWord(FG_Instance *inst, uint16_t word)
  */
 void FG_JoinBroadcast(FG_Instance *inst)
 {
+	// NSS down
 	inst->NSS_GPIO->ODR &= ~inst->NSS_PIN;
 }
 
@@ -45,6 +61,9 @@ void FG_JoinBroadcast(FG_Instance *inst)
  */
 void FG_LeaveBroadcast(FG_Instance *inst)
 {
+	// Wait for write to complete
+	while(SPI_GetFlagStatus(SPI_FLAG_BSY));
+	// NSS up
 	inst->NSS_GPIO->ODR |= inst->NSS_PIN;
 }
 
@@ -235,7 +254,7 @@ void FG_Reset(FG_Instance *inst)
 }
 
 /**
- * @brief Configure a function generator *
+ * @brief Configure a function generator
  * Sets up the GPIO pin and resets the target.
  * SPI must already be configured!
  *
@@ -253,6 +272,10 @@ void FG_Init(FG_Instance *inst, GPIO_TypeDef *NSS_GPIO, GPIO_Pin_TypeDef NSS_PIN
 	FG_Reset(inst);
 }
 
+/**
+ * @brief Configure SPI for talking to FG devices
+ * Sets up GPIOs and inits the SPI peripheral
+ */
 void FG_SPI_Init(void)
 {
 	// MOSI, SCK
@@ -268,12 +291,4 @@ void FG_SPI_Init(void)
 			 0);
 
 	SPI_Cmd(ENABLE);
-}
-
-static void FG_SPI_Send16(uint16_t word)
-{
-	SPI_SendData((u8)(word >> 8));
-	while(!SPI_GetFlagStatus(SPI_FLAG_TXE));
-	SPI_SendData((u8)(word));
-	while(SPI_GetFlagStatus(SPI_FLAG_BSY));
 }
